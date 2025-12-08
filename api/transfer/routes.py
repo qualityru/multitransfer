@@ -62,17 +62,9 @@ async def get_countries():
     ]
 
 
-def get_proxy() -> str:
-    """
-    Берём новый бесплатный прокси.
-    Можно указать country_id=['RU'] если нужно русские.
-    """
-    return FreeProxy(timeout=1, anonym=True).get()
-
-
 async def solve_yandex_captcha(sitekey: str, pageurl: str) -> str:
     async with aiohttp.ClientSession() as session:
-        proxy = get_proxy()
+        proxy = FreeProxy(timeout=1, anonym=True).get()
         logger.debug(f"Using proxy for RuCaptcha: {proxy}")
         send_payload = {
             "key": RU_CAPTCHA_KEY,
