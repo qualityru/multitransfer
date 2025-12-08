@@ -65,7 +65,7 @@ async def get_countries():
 async def solve_yandex_captcha(sitekey: str, pageurl: str) -> str:
     async with aiohttp.ClientSession() as session:
         # proxy = FreeProxy(timeout=1, anonym=True).get()
-        logger.debug(f"Using proxy for RuCaptcha: {proxy}")
+        # logger.debug(f"Using proxy for RuCaptcha: {proxy}")
         send_payload = {
             "key": RU_CAPTCHA_KEY,
             "method": "yandex",
