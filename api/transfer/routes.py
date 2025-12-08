@@ -78,7 +78,7 @@ async def solve_yandex_captcha(sitekey: str, pageurl: str) -> str:
         }
 
         async with session.post(
-            "http://rucaptcha.com/in.php", data=send_payload
+            "http://2captcha.com/in.php", data=send_payload
         ) as resp:
             data = await resp.json()
             logger.debug(f"RuCaptcha create task response: {data}")
@@ -93,7 +93,7 @@ async def solve_yandex_captcha(sitekey: str, pageurl: str) -> str:
             await asyncio.sleep(2.5)
 
             async with session.get(
-                "http://rucaptcha.com/res.php",
+                "http://2captcha.com/res.php",
                 params={
                     "key": RU_CAPTCHA_KEY,
                     "action": "get",
