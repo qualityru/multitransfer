@@ -14,9 +14,9 @@ class Settings(BaseSettings):
     DB_PASS: str = Field(..., env="DB_PASS")
     DB_NAME: str = Field(..., env="DB_NAME")
 
-    REDIS_HOST: str = Field(..., env="REDIS_HOST")
-    REDIS_PORT: str = Field(..., env="REDIS_PORT")
-    REDIS_PASS: str = Field(..., env="REDIS_PASS")
+    # REDIS_HOST: str = Field(..., env="REDIS_HOST")
+    # REDIS_PORT: str = Field(..., env="REDIS_PORT")
+    # REDIS_PASS: str = Field(..., env="REDIS_PASS")
 
     SECRET_KEY: str = Field(..., env="SECRET_KEY")
 
@@ -30,8 +30,7 @@ class Settings(BaseSettings):
 
     # ADMIN_TOKEN: str = Field(..., env="ADMIN_TOKEN")
 
-    URL_NOTIFY: str = Field(..., env="URL_NOTIFY")
-    COINMARKETCAP_API_KEY: str = Field(..., env="COINMARKETCAP_API_KEY")
+    RU_CAPTCHA_KEY: str = Field(..., env="RU_CAPTCHA_KEY")
 
     @property
     def DB_URL(self):
