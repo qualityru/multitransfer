@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime, timedelta
 import json
 import uuid
 from typing import Dict, List
@@ -45,7 +46,8 @@ def load_countries_from_json(file_path: str = "multitransfer_data.json") -> List
 COUNTRIES_DATA = load_countries_from_json()
 COUNTRIES_DICT = {c["code"]: c for c in COUNTRIES_DATA}
 COUNTRY_CODES = [c["code"] for c in COUNTRIES_DATA]
-CAPTCHA_TOKENS: list[str] = []
+CAPTCHA_TOKENS: dict[str, datetime] = {}
+TOKEN_LIFETIME = timedelta(minutes=5)
 
 
 @router.get("/countries_and_currencies", response_model=List[Country])
@@ -63,9 +65,7 @@ async def get_countries():
 
 async def solve_yandex_captcha(sitekey: str, pageurl: str) -> str:
     solver = TwoCaptcha(apiKey=settings.RU_CAPTCHA_KEY, pollingInterval=5)
-
     loop = asyncio.get_event_loop()
-
     try:
         result = await loop.run_in_executor(
             None,
@@ -77,9 +77,21 @@ async def solve_yandex_captcha(sitekey: str, pageurl: str) -> str:
             )
         )
         return result.get("code")
-
     except Exception as e:
         raise HTTPException(500, f"Ошибка решателя: {e}")
+
+
+def get_valid_token() -> str | None:
+    now = datetime.utcnow()
+    valid_tokens = {t: ts for t, ts in CAPTCHA_TOKENS.items() if now - ts <= TOKEN_LIFETIME}
+    CAPTCHA_TOKENS.clear()
+    CAPTCHA_TOKENS.update(valid_tokens)
+
+    if not CAPTCHA_TOKENS:
+        return None
+
+    token, _ = CAPTCHA_TOKENS.popitem()
+    return token
 
 
 @router.post("/solve_captcha")
@@ -90,13 +102,12 @@ async def get_captcha_token():
     async def solve_and_store():
         try:
             token = await solve_yandex_captcha(sitekey, pageurl)
-            CAPTCHA_TOKENS.append(token)
+            CAPTCHA_TOKENS[token] = datetime.utcnow()
             logger.debug(f"Captcha token added in background. Total tokens: {len(CAPTCHA_TOKENS)}")
         except Exception as e:
             logger.error(f"Failed to solve captcha in background: {e}")
 
     asyncio.create_task(solve_and_store())
-
     return {"message": "Captcha solving started in background", "queue_size": len(CAPTCHA_TOKENS)}
 
 
@@ -118,11 +129,11 @@ async def create_transfer(
     doc_series: str = Query("1232"),
     doc_issue_date: str = Query("2011-11-12T12:00:00"),
 ):
-    if not CAPTCHA_TOKENS:
+    token = get_valid_token()
+    if not token:
         raise HTTPException(400, "Нет доступных токенов капчи. Сначала вызовите /solve_captcha")
 
-    token = CAPTCHA_TOKENS.pop(0)
-    logger.debug(f"Using captcha token from queue. Remaining tokens: {len(CAPTCHA_TOKENS)}")
+    logger.debug(f"Using captcha token. Remaining tokens: {len(CAPTCHA_TOKENS)}")
 
     BASE_HEADERS = {
         "Content-Type": "application/json",
@@ -172,7 +183,6 @@ async def create_transfer(
                 "withdrawMoney": {"currencyCode": currency_to},
             },
         }
-
         commissions_data = await post_with_retries(session, URL_COMMISSIONS, commission_payload, generate_headers())
         commission_id = commissions_data["fees"][0]["commissions"][0]["commissionId"]
         logger.debug(f"Using commission ID: {commission_id}")
@@ -200,7 +210,6 @@ async def create_transfer(
                 }],
             },
         }
-
         create_headers = generate_headers({"fhptokenid": token})
         create_response = await post_with_retries(session, URL_CREATE, create_payload, create_headers)
         transfer_id = create_response["transferId"]
