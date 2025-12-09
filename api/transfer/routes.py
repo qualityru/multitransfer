@@ -55,6 +55,7 @@ TOKEN_LIFETIME = timedelta(minutes=5)
 
 @router.get("/countries_and_currencies", response_model=List[Country])
 async def get_countries():
+    """Получить список стран и валют, исключая USD и EUR"""
     return [
         Country(
             country_code=c["code"],
@@ -101,6 +102,7 @@ def get_valid_token() -> str | None:
 
 @router.post("/solve_captcha")
 async def get_captcha_token():
+    """Получить токен капчи в фоне для последующего использования"""
     sitekey = "ysc1_DAo8nFPdNCMHkAwYxIUJFxW5IIJd3ITGArZehXxO9a0ea6f8"
     pageurl = "https://multitransfer.ru/transfer/tajikistan/sender-details&test=false&webview=false&hideChallengeContainer=false"
 
@@ -139,6 +141,7 @@ async def create_transfer(
     doc_series: str = Query("1232"),
     doc_issue_date: str = Query("2011-11-12T12:00:00"),
 ):
+    """Получить QR-код для оплаты перевода"""
     token = get_valid_token()
     if not token:
         raise HTTPException(

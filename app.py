@@ -7,18 +7,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api import api_app
 
-# @asynccontextmanager
-# async def lifespan(app: FastAPI):
-#     task = asyncio.create_task(load_countries())
-#     yield
-#     task.cancel()
-#     try:
-#         await task
-#     except:
-#         pass
-
-
-# app = FastAPI(lifespan=lifespan)
 app = FastAPI()
 
 app.mount("/api", api_app, "API")
