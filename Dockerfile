@@ -1,7 +1,6 @@
 FROM python:3.13-slim-bullseye
 COPY . /app
 WORKDIR /app
-# VOLUME /app/static
 RUN pip install -r requirements.txt
 CMD gunicorn app:app \
     --workers 4 \

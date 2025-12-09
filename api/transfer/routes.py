@@ -1,22 +1,25 @@
 import asyncio
-from datetime import datetime, timedelta
 import json
 import uuid
+from datetime import datetime, timedelta
 from typing import Dict, List
 
 import aiohttp
 from fastapi import APIRouter, HTTPException
 from fastapi.params import Query
-from twocaptcha import TwoCaptcha
 from loguru import logger
+from twocaptcha import TwoCaptcha
+
+from config import settings
 
 from .schemas import Country
-from config import settings
 
 router = APIRouter(prefix="/transfer", tags=["Transfer"])
 
 
-def load_countries_from_json(file_path: str = "multitransfer_data.json") -> List[Dict]:
+def load_countries_from_json(
+    file_path: str = "static/multitransfer_data.json",
+) -> List[Dict]:
     """Загружает список стран из JSON файла"""
     try:
         with open(file_path, "r", encoding="utf-8") as f:
@@ -73,8 +76,8 @@ async def solve_yandex_captcha(sitekey: str, pageurl: str) -> str:
                 sitekey=sitekey,
                 url=pageurl,
                 invisible=0,
-                userAgent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36"
-            )
+                userAgent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
+            ),
         )
         return result.get("code")
     except Exception as e:
@@ -83,7 +86,9 @@ async def solve_yandex_captcha(sitekey: str, pageurl: str) -> str:
 
 def get_valid_token() -> str | None:
     now = datetime.utcnow()
-    valid_tokens = {t: ts for t, ts in CAPTCHA_TOKENS.items() if now - ts <= TOKEN_LIFETIME}
+    valid_tokens = {
+        t: ts for t, ts in CAPTCHA_TOKENS.items() if now - ts <= TOKEN_LIFETIME
+    }
     CAPTCHA_TOKENS.clear()
     CAPTCHA_TOKENS.update(valid_tokens)
 
@@ -103,12 +108,17 @@ async def get_captcha_token():
         try:
             token = await solve_yandex_captcha(sitekey, pageurl)
             CAPTCHA_TOKENS[token] = datetime.utcnow()
-            logger.debug(f"Captcha token added in background. Total tokens: {len(CAPTCHA_TOKENS)}")
+            logger.debug(
+                f"Captcha token added in background. Total tokens: {len(CAPTCHA_TOKENS)}"
+            )
         except Exception as e:
             logger.error(f"Failed to solve captcha in background: {e}")
 
     asyncio.create_task(solve_and_store())
-    return {"message": "Captcha solving started in background", "queue_size": len(CAPTCHA_TOKENS)}
+    return {
+        "message": "Captcha solving started in background",
+        "queue_size": len(CAPTCHA_TOKENS),
+    }
 
 
 @router.post("/create")
@@ -131,7 +141,9 @@ async def create_transfer(
 ):
     token = get_valid_token()
     if not token:
-        raise HTTPException(400, "Нет доступных токенов капчи. Сначала вызовите /solve_captcha")
+        raise HTTPException(
+            400, "Нет доступных токенов капчи. Сначала вызовите /solve_captcha"
+        )
 
     logger.debug(f"Using captcha token. Remaining tokens: {len(CAPTCHA_TOKENS)}")
 
@@ -155,7 +167,9 @@ async def create_transfer(
             headers.update(extra)
         return headers
 
-    async def post_with_retries(session, url: str, payload: dict, headers: dict, retries: int = 3):
+    async def post_with_retries(
+        session, url: str, payload: dict, headers: dict, retries: int = 3
+    ):
         last_error = None
         for attempt in range(1, retries + 1):
             try:
@@ -183,13 +197,18 @@ async def create_transfer(
                 "withdrawMoney": {"currencyCode": currency_to},
             },
         }
-        commissions_data = await post_with_retries(session, URL_COMMISSIONS, commission_payload, generate_headers())
+        commissions_data = await post_with_retries(
+            session, URL_COMMISSIONS, commission_payload, generate_headers()
+        )
         commission_id = commissions_data["fees"][0]["commissions"][0]["commissionId"]
         logger.debug(f"Using commission ID: {commission_id}")
 
         URL_CREATE = "https://api.multitransfer.ru/anonymous/multi/multitransfer-transfer-create/v3/anonymous/transfers/create"
         create_payload = {
-            "beneficiary": {"lastName": beneficiary_last_name, "firstName": beneficiary_first_name},
+            "beneficiary": {
+                "lastName": beneficiary_last_name,
+                "firstName": beneficiary_first_name,
+            },
             "transfer": {
                 "beneficiaryAccountNumber": account_number,
                 "commissionId": commission_id,
@@ -201,22 +220,28 @@ async def create_transfer(
                 "middleName": sender_middle_name,
                 "birthDate": sender_birth_date,
                 "phoneNumber": sender_phone,
-                "documents": [{
-                    "type": doc_type,
-                    "number": doc_number,
-                    "series": doc_series,
-                    "issueDate": doc_issue_date,
-                    "countryCode": "RUS",
-                }],
+                "documents": [
+                    {
+                        "type": doc_type,
+                        "number": doc_number,
+                        "series": doc_series,
+                        "issueDate": doc_issue_date,
+                        "countryCode": "RUS",
+                    }
+                ],
             },
         }
         create_headers = generate_headers({"fhptokenid": token})
-        create_response = await post_with_retries(session, URL_CREATE, create_payload, create_headers)
+        create_response = await post_with_retries(
+            session, URL_CREATE, create_payload, create_headers
+        )
         transfer_id = create_response["transferId"]
         logger.debug(f"Created transfer ID: {transfer_id}")
 
         URL_CONFIRM = "https://api.multitransfer.ru/anonymous/multi/multitransfer-qr-processing/v3/anonymous/confirm"
         confirm_payload = {"transactionId": transfer_id, "recordType": "transfer"}
-        confirm_data = await post_with_retries(session, URL_CONFIRM, confirm_payload, generate_headers())
+        confirm_data = await post_with_retries(
+            session, URL_CONFIRM, confirm_payload, generate_headers()
+        )
 
         return confirm_data
